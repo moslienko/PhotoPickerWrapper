@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-public class PhotoPickerAlert {
+private class PhotoPickerAlert {
     
     static func alertTitle(for type: ImagePickerSourceType) -> String {
         switch type {
@@ -26,6 +26,12 @@ public class PhotoPickerAlert {
             return ImagePickerLocale.galleryUnavailableMessage.locale
         }
     }
+    
+    static func openSettings() {
+        if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(settingsURL)
+        }
+    }
 }
 
 public class PhotoPickerErrorAlert {
@@ -41,9 +47,7 @@ public class PhotoPickerErrorAlert {
             title: ImagePickerLocale.openSettings.locale,
             style: .default,
             handler: { _ in
-                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(settingsURL)
-                }
+                PhotoPickerAlert.openSettings()
             }))
         
         alertController.addAction(UIAlertAction(
@@ -71,9 +75,7 @@ public struct PhotoPickerAlertModifier: ViewModifier {
                 title: Text(PhotoPickerAlert.alertTitle(for: type)),
                 message: Text(PhotoPickerAlert.alertMessage(for: type)),
                 primaryButton: .default(Text(ImagePickerLocale.openSettings.locale), action: {
-                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(settingsURL)
-                    }
+                    PhotoPickerAlert.openSettings()
                 }),
                 secondaryButton: .cancel()
             )

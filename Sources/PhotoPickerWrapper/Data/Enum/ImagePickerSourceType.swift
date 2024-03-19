@@ -6,8 +6,9 @@
 //
 
 import Foundation
+import PhotosUI
 
 public enum ImagePickerSourceType {
-    case camera
-    case photoLibrary
+    case camera(type: ImagePickerMediaType)
+    case photoLibrary(filter: PHPickerFilter?)
 }

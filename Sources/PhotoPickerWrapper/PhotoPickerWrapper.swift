@@ -9,29 +9,22 @@ import Foundation
 import PhotosUI
 import SwiftUI
 
+public typealias PhotoPickerCallback = ((AssetData) -> Void)
+
 public class PhotoPickerWrapper: NSObject {
     
     public var params: ImagePickerParams
     
-    public var onImagesPicked: (([UIImage]) -> Void)?
-    public var onVideosPicked: (([URL]) -> Void)?
+    public var didAssetSelected: PhotoPickerCallback?
     
-    public init(params: ImagePickerParams, onImagesPicked: (([UIImage]) -> Void)? = nil, onVideosPicked: (([URL]) -> Void)? = nil) {
+    public init(params: ImagePickerParams, didAssetSelected: PhotoPickerCallback?) {
         self.params = params
-        self.onImagesPicked = onImagesPicked
-        self.onVideosPicked = onVideosPicked
+        self.didAssetSelected = didAssetSelected
     }
     
     public func showPicker(on parentVC: UIViewController) {
         let picker = self.createPickerVC()
         parentVC.present(picker, animated: true, completion: nil)
-    }
-    
-    private func createPhotoPickerConfiguration() -> PHPickerConfiguration {
-        var config = PHPickerConfiguration()
-        config.filter = params.filter
-        config.selectionLimit = params.selectionLimit
-        return config
     }
     
     public static func tryGetPhotoPermission(onAllow: (() -> Void)?, onDeny: (() -> Void)?) {
@@ -61,31 +54,42 @@ public class PhotoPickerWrapper: NSObject {
 }
 
 // MARK: - Module methods
-private extension PhotoPickerWrapper {
+extension PhotoPickerWrapper {
     
     func createPickerVC() -> UIViewController {
         switch params.sourceType {
-        case .camera:
+        case let .camera(mediaType):
             let picker = UIImagePickerController()
             picker.allowsEditing = params.allowsEditing
             picker.sourceType = .camera
             picker.delegate = self
             
-            switch params.mediaType {
+            switch mediaType {
             case .photo:
+                picker.mediaTypes = ["public.image"]
                 picker.cameraCaptureMode = .photo
             case .video:
+                picker.mediaTypes = ["public.movie"]
                 picker.cameraCaptureMode = .video
             }
             
             return picker
-        case .photoLibrary:
-            let picker = PHPickerViewController(configuration: createPhotoPickerConfiguration())
+        case let .photoLibrary(filter):
+            let picker = PHPickerViewController(configuration: createPhotoPickerConfiguration(filter: filter))
             picker.navigationController?.navigationBar.tintColor = params.tintColor
             picker.delegate = self
             
             return picker
         }
+    }
+    
+    
+    private func createPhotoPickerConfiguration(filter: PHPickerFilter?) -> PHPickerConfiguration {
+        var config = PHPickerConfiguration()
+        config.filter = filter
+        config.selectionLimit = params.selectionLimit
+        
+        return config
     }
 }
 
@@ -93,27 +97,38 @@ private extension PhotoPickerWrapper {
 extension PhotoPickerWrapper: PHPickerViewControllerDelegate {
     
     public func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-        var selectedImages: [UIImage] = []
+        var selectedAssets = AssetData(images: [], videoUrls: [])
         let dispatchGroup = DispatchGroup()
         
         for result in results {
             dispatchGroup.enter()
-            result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { url, error in
-                guard let url = url,
-                      let filter = CIFilter(imageURL: url),
-                      let ciImage = filter.outputImage
-                else {
+            if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                result.itemProvider.loadObject(ofClass: UIImage.self) { (object, error) in
+                    if let error = error {
+                        print("Failed load image: \(error.localizedDescription)")
+                    }
+                    if let image = object as? UIImage {
+                        selectedAssets.images += [image.normalizedImage()]
+                    }
                     dispatchGroup.leave()
-                    return
                 }
-                
-                let image = UIImage(ciImage: ciImage)
-                selectedImages.append(image.normalizedImage())
+            } else if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { (url, error) in
+                    if let error = error {
+                        print("Failed load video: \(error.localizedDescription)")
+                    }
+                    if let videoURL = url {
+                        selectedAssets.videoUrls += [videoURL]
+                    }
+                    dispatchGroup.leave()
+                }
+            } else {
                 dispatchGroup.leave()
             }
         }
+        
         dispatchGroup.notify(queue: .main) { [weak self] in
-            self?.onImagesPicked?(selectedImages)
+            self?.didAssetSelected?(selectedAssets)
         }
         
         picker.dismiss(animated: true, completion: nil)
@@ -124,49 +139,25 @@ extension PhotoPickerWrapper: PHPickerViewControllerDelegate {
 extension PhotoPickerWrapper: UINavigationControllerDelegate, UIImagePickerControllerDelegate {
     
     public func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+        var selectedAssets = AssetData(images: [], videoUrls: [])
+        
         if let mediaType = info[.mediaType] as? String {
-            if mediaType == "public.image",
-                let image = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage {
-                self.onImagesPicked?([image.normalizedImage()])
+            if mediaType == "public.image" {
+                if let image = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage {
+                    selectedAssets.images += [image.normalizedImage()]
+                }
             } else if mediaType == "public.movie" {
                 if let videoURL = info[.mediaURL] as? URL {
-                    self.onVideosPicked?([videoURL])
+                    selectedAssets.videoUrls += [videoURL]
                 }
             }
         }
+        
+        self.didAssetSelected?(selectedAssets)
         picker.dismiss(animated: true, completion: nil)
     }
     
     public func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
         picker.dismiss(animated: true, completion: nil)
-    }
-}
-
-// MARK: - SwiftUI wrapper
-public struct ImagePicker: UIViewControllerRepresentable {
-    
-    public var picker: PhotoPickerWrapper
-    
-    public init(picker: PhotoPickerWrapper) {
-        self.picker = picker
-    }
-    
-    public func makeUIViewController(context: Context) -> UIViewController {
-        picker.createPickerVC()
-    }
-    
-    public func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-    }
-    
-    public func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    public class Coordinator: NSObject {
-        let parent: ImagePicker
-        
-        init(_ parent: ImagePicker) {
-            self.parent = parent
-        }
     }
 }
