@@ -27,7 +27,7 @@ public class PhotoPickerWrapper: NSObject {
         self.didHandlePickerErrors = didHandlePickerErrors
     }
     
-    /// Diplay picker
+    /// Diplay picker with UIKit
     /// - Parameter parentVC: Parent view controoler
     public func showPicker(on parentVC: UIViewController) {
         let picker = self.createPickerVC()
@@ -65,6 +65,11 @@ public class PhotoPickerWrapper: NSObject {
         default:
             onDeny?()
         }
+    }
+    
+    /// Picker available for display with SwiftUI
+    public var view: SwiftUIPhotoPicker {
+        SwiftUIPhotoPicker(picker: self)
     }
 }
 

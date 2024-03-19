@@ -9,6 +9,6 @@ import Foundation
 import PhotosUI
 
 public enum ImagePickerSourceType {
-    case camera(type: UIImagePickerController.CameraCaptureMode)
-    case photoLibrary(filter: PHPickerFilter?)
+    case camera(type: UIImagePickerController.CameraCaptureMode = .photo)
+    case photoLibrary(filter: PHPickerFilter? = nil)
 }
