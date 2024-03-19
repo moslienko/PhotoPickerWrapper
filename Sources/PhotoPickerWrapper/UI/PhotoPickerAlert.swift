@@ -36,6 +36,10 @@ private class PhotoPickerAlert {
 
 public class PhotoPickerErrorAlert {
     
+    /// Display an alert if the user has refused to give permissions
+    /// - Parameters:
+    ///   - type: Picker type
+    ///   - viewController: Parent view controller
     public static func presentAlert(for type: ImagePickerSourceType, in viewController: UIViewController) {
         let alertController = UIAlertController(
             title: PhotoPickerAlert.alertTitle(for: type),

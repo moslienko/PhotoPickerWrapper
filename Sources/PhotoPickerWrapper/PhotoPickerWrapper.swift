@@ -10,23 +10,34 @@ import PhotosUI
 import SwiftUI
 
 public typealias PhotoPickerCallback = ((AssetData) -> Void)
+public typealias ErrorPickerCallback = (([Error]) -> Void)
 
 public class PhotoPickerWrapper: NSObject {
     
+    // MARK: - Parametets
     public var params: ImagePickerParams
     
+    // MARK: - Callbacks
     public var didAssetSelected: PhotoPickerCallback?
-    
-    public init(params: ImagePickerParams, didAssetSelected: PhotoPickerCallback?) {
+    public var didHandlePickerErrors: ErrorPickerCallback?
+
+    public init(params: ImagePickerParams, didAssetSelected: PhotoPickerCallback?, didHandlePickerErrors: ErrorPickerCallback? = nil) {
         self.params = params
         self.didAssetSelected = didAssetSelected
+        self.didHandlePickerErrors = didHandlePickerErrors
     }
     
+    /// Diplay picker
+    /// - Parameter parentVC: Parent view controoler
     public func showPicker(on parentVC: UIViewController) {
         let picker = self.createPickerVC()
         parentVC.present(picker, animated: true, completion: nil)
     }
     
+    /// Request permission from the user to access the photo gallery
+    /// - Parameters:
+    ///   - onAllow: Permission granted callback
+    ///   - onDeny: Permission denied callback
     public static func tryGetPhotoPermission(onAllow: (() -> Void)?, onDeny: (() -> Void)?) {
         PHPhotoLibrary.requestAuthorization { status in
             DispatchQueue.main.async {
@@ -35,6 +46,10 @@ public class PhotoPickerWrapper: NSObject {
         }
     }
     
+    /// Request permission from the user to access the camera
+    /// - Parameters:
+    ///   - onAllow: Permission granted callback
+    ///   - onDeny: Permission denied callback
     public static func tryGetCameraPermission(onAllow: (() -> Void)?, onDeny: (() -> Void)?) {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
@@ -56,23 +71,18 @@ public class PhotoPickerWrapper: NSObject {
 // MARK: - Module methods
 extension PhotoPickerWrapper {
     
+    /// Create a picker with the earlier defined parametersr
+    /// - Returns: Photo controller, UIImagePickerController or PHPickerViewController
     func createPickerVC() -> UIViewController {
         switch params.sourceType {
         case let .camera(mediaType):
             let picker = UIImagePickerController()
             picker.allowsEditing = params.allowsEditing
             picker.sourceType = .camera
+            picker.mediaTypes = mediaType == .photo ? ["public.image"] : ["public.movie"]
+            picker.cameraCaptureMode = mediaType
             picker.delegate = self
-            
-            switch mediaType {
-            case .photo:
-                picker.mediaTypes = ["public.image"]
-                picker.cameraCaptureMode = .photo
-            case .video:
-                picker.mediaTypes = ["public.movie"]
-                picker.cameraCaptureMode = .video
-            }
-            
+
             return picker
         case let .photoLibrary(filter):
             let picker = PHPickerViewController(configuration: createPhotoPickerConfiguration(filter: filter))
@@ -83,7 +93,9 @@ extension PhotoPickerWrapper {
         }
     }
     
-    
+    /// Create configuration for PHPicker
+    /// - Parameter filter: Picker filter
+    /// - Returns: Configuration
     private func createPhotoPickerConfiguration(filter: PHPickerFilter?) -> PHPickerConfiguration {
         var config = PHPickerConfiguration()
         config.filter = filter
@@ -98,6 +110,7 @@ extension PhotoPickerWrapper: PHPickerViewControllerDelegate {
     
     public func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         var selectedAssets = AssetData(images: [], videoUrls: [])
+        var errors: [Error] = []
         let dispatchGroup = DispatchGroup()
         
         for result in results {
@@ -106,6 +119,7 @@ extension PhotoPickerWrapper: PHPickerViewControllerDelegate {
                 result.itemProvider.loadObject(ofClass: UIImage.self) { (object, error) in
                     if let error = error {
                         print("Failed load image: \(error.localizedDescription)")
+                        errors += [error]
                     }
                     if let image = object as? UIImage {
                         selectedAssets.images += [image.normalizedImage()]
@@ -116,6 +130,7 @@ extension PhotoPickerWrapper: PHPickerViewControllerDelegate {
                 result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { (url, error) in
                     if let error = error {
                         print("Failed load video: \(error.localizedDescription)")
+                        errors += [error]
                     }
                     if let videoURL = url {
                         selectedAssets.videoUrls += [videoURL]
@@ -129,6 +144,9 @@ extension PhotoPickerWrapper: PHPickerViewControllerDelegate {
         
         dispatchGroup.notify(queue: .main) { [weak self] in
             self?.didAssetSelected?(selectedAssets)
+            if !errors.isEmpty {
+                self?.didHandlePickerErrors?(errors)
+            }
         }
         
         picker.dismiss(animated: true, completion: nil)
