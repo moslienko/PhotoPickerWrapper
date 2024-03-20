@@ -29,18 +29,38 @@ dependencies: [
 ]
 ```
 
-Alternatively navigate to your Xcode project, select `Swift Packages` and click the `+` icon to search for `RegionBlocker`.
+Alternatively navigate to your Xcode project, select `Swift Packages` and click the `+` icon to search for `PhotoPickerWrapper`.
 
 ### Manually
 
-If you prefer not to use any of the aforementioned dependency managers, you can integrate RegionBlocker into your project manually. Simply drag the `Sources` Folder into your Xcode project.
+If you prefer not to use any of the aforementioned dependency managers, you can integrate PhotoPickerWrapper into your project manually. Simply drag the `Sources` Folder into your Xcode project.
 
 ## Usage
 
 ### UIKit
 
 ```swift
+ lazy var picker: PhotoPickerWrapper = {
+     PhotoPickerWrapper(
+         params: ImagePickerParams(selectionLimit: 2, sourceType: .photoLibrary(filter: nil)),
+         didAssetSelected: { assets in }
+     )
+ }()
 
+ func tryOpenPicker() {
+    PhotoPickerWrapper.tryGetPhotoPermission(onAllow: {
+        self.showPicker()
+    }, onDeny: {
+        PhotoPickerWrapper.presentAlert(
+            for: .photoLibrary(),
+            in: self
+        )
+    })
+}
+
+func showPicker() {
+    self.picker.showPicker(on: self)
+}
 ```
 
 ### SwiftUI
@@ -76,7 +96,7 @@ func openPicker() {
         self.selectedImages = []
         self.isPhotoPickerPresented = true
     }, onDeny: {
-        self.isAlertFotDenyCameraPresented = true
+        self.isAlertFotDenyGalleryPresented = true
     })
 }
 ```
