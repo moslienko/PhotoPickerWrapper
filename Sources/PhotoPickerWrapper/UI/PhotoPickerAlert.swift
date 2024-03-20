@@ -7,34 +7,15 @@
 
 import SwiftUI
 
-private class PhotoPickerAlert {
-    
-    static func alertTitle(for type: ImagePickerSourceType) -> String {
-        switch type {
-        case .camera:
-            return ImagePickerLocale.cameraUnavailableTitle.locale
-        case .photoLibrary:
-            return ImagePickerLocale.galleryUnavailableTitle.locale
-        }
-    }
-    
-    static func alertMessage(for type: ImagePickerSourceType) -> String {
-        switch type {
-        case .camera:
-            return ImagePickerLocale.cameraUnavailableMessage.locale
-        case .photoLibrary:
-            return ImagePickerLocale.galleryUnavailableMessage.locale
-        }
-    }
-    
-    static func openSettings() {
-        if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-            UIApplication.shared.open(settingsURL)
-        }
-    }
+public protocol PhotoPickerErrorAlert: AnyObject {
+    static func presentAlert(for type: ImagePickerSourceType, in viewController: UIViewController)
+    static func alertTitle(for type: ImagePickerSourceType) -> String
+    static func alertMessage(for type: ImagePickerSourceType) -> String
+    static func openSettings()
 }
 
-public class PhotoPickerErrorAlert {
+// MARK: - PhotoPickerErrorAlert
+extension PhotoPickerWrapper: PhotoPickerErrorAlert {
     
     /// Display an alert if the user has refused to give permissions
     /// - Parameters:
@@ -42,8 +23,8 @@ public class PhotoPickerErrorAlert {
     ///   - viewController: Parent view controller
     public static func presentAlert(for type: ImagePickerSourceType, in viewController: UIViewController) {
         let alertController = UIAlertController(
-            title: PhotoPickerAlert.alertTitle(for: type),
-            message: PhotoPickerAlert.alertMessage(for: type),
+            title: PhotoPickerWrapper.alertTitle(for: type),
+            message: PhotoPickerWrapper.alertMessage(for: type),
             preferredStyle: .alert
         )
         
@@ -51,7 +32,7 @@ public class PhotoPickerErrorAlert {
             title: ImagePickerLocale.openSettings.locale,
             style: .default,
             handler: { _ in
-                PhotoPickerAlert.openSettings()
+                PhotoPickerWrapper.openSettings()
             }))
         
         alertController.addAction(UIAlertAction(
@@ -62,8 +43,33 @@ public class PhotoPickerErrorAlert {
         
         viewController.present(alertController, animated: true, completion: nil)
     }
+    
+    public static func alertTitle(for type: ImagePickerSourceType) -> String {
+        switch type {
+        case .camera:
+            return ImagePickerLocale.cameraUnavailableTitle.locale
+        case .photoLibrary:
+            return ImagePickerLocale.galleryUnavailableTitle.locale
+        }
+    }
+    
+    public static func alertMessage(for type: ImagePickerSourceType) -> String {
+        switch type {
+        case .camera:
+            return ImagePickerLocale.cameraUnavailableMessage.locale
+        case .photoLibrary:
+            return ImagePickerLocale.galleryUnavailableMessage.locale
+        }
+    }
+    
+    public static func openSettings() {
+        if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(settingsURL)
+        }
+    }
 }
 
+// MARK: - SwiftUI
 public struct PhotoPickerAlertModifier: ViewModifier {
     @Binding var isPresented: Bool
     let type: ImagePickerSourceType
@@ -76,10 +82,10 @@ public struct PhotoPickerAlertModifier: ViewModifier {
     public func body(content: Content) -> some View {
         content.alert(isPresented: $isPresented) {
             Alert(
-                title: Text(PhotoPickerAlert.alertTitle(for: type)),
-                message: Text(PhotoPickerAlert.alertMessage(for: type)),
+                title: Text(PhotoPickerWrapper.alertTitle(for: type)),
+                message: Text(PhotoPickerWrapper.alertMessage(for: type)),
                 primaryButton: .default(Text(ImagePickerLocale.openSettings.locale), action: {
-                    PhotoPickerAlert.openSettings()
+                    PhotoPickerWrapper.openSettings()
                 }),
                 secondaryButton: .cancel()
             )
