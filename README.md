@@ -1,5 +1,5 @@
 <p align="center">
-   <img width="200" src="https://raw.githubusercontent.com/SvenTiigi/SwiftKit/gh-pages/readMeAssets/SwiftKitLogo.png" alt="PhotoPickerWrapper Logo">
+   <img width="200" src="https://moslienko.github.io/Assets/PhotoPickerWrapper/sdk.png" alt="PhotoPickerWrapper Logo">
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 # PhotoPickerWrapper
 
 <p align="center">
-ℹ️ UIKit and SwiftUI wrapping library to select photo and video from gallery or camera 
+UIKit and SwiftUI wrapping library to select photo and video from gallery or camera 
 </p>
 
 ## Installation
